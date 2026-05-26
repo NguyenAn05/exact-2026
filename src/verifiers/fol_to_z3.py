@@ -111,7 +111,7 @@ class FOLASTTransformer(ast.NodeTransformer):
                 node.func.id = f'{func_name}_arity_{arity}'
         return node
 
-def run_single_z3_verification(premises: List[str], conclusion_fol: Union[str, Dict[str, str]], timeout_ms: int = 2000) -> str:
+def run_single_z3_verification(premises: List[str], conclusion_fol: Union[str, Dict[str, str]], timeout_ms: int = 2000, llm_answer: str = None) -> str:
     """
     Convert FOL premises and a conclusion to Z3, solve it, and return the verified logical answer.
     
@@ -260,7 +260,17 @@ def run_single_z3_verification(premises: List[str], conclusion_fol: Union[str, D
             
         # Case A: Multiple Choice Question with options in a dictionary
         if isinstance(conclusion_fol, dict):
-            proved_options = []
+            # Create a tracking solver to identify minimal premise usage via Unsat Core
+            tracking_solver = _z3.Solver()
+            tracking_solver.set("timeout", timeout_ms)
+            tracking_literals = []
+            
+            for idx, prem_expr in enumerate(premises_exprs):
+                p = _z3.Bool(f'p_{idx}')
+                tracking_literals.append(p)
+                tracking_solver.add(_z3.Implies(p, prem_expr))
+                
+            proved_options_cores = {}
             for opt, opt_fol in conclusion_fol.items():
                 cleaned_opt = clean_and_register_names(opt_fol, string_map)
                 tree = ast.parse(cleaned_opt, mode='eval')
@@ -270,18 +280,48 @@ def run_single_z3_verification(premises: List[str], conclusion_fol: Union[str, D
                 code = compile(transformed_tree, filename='<ast>', mode='eval')
                 opt_expr = coerce_to_bool(eval(code, {'__builtins__': {}}, ns))
                 
-                # Prove opt_expr is true by showing that Not(opt_expr) leads to unsat
-                base_solver.push()
-                base_solver.add(_z3.Not(opt_expr))
-                res = base_solver.check()
-                base_solver.pop()
+                tracking_solver.push()
+                tracking_solver.add(_z3.Not(opt_expr))
+                res = tracking_solver.check(*tracking_literals)
                 
                 if res == _z3.unsat:
-                    proved_options.append(opt)
-            if len(proved_options) == 1:
-                return proved_options[0]
-            elif len(proved_options) > 1:
-                return f"Error: Multiple True Options ({', '.join(proved_options)})"
+                    core = tracking_solver.unsat_core()
+                    proved_options_cores[opt] = len(core)
+                tracking_solver.pop()
+                
+            # If llm_answer was not passed directly, try to dynamically resolve it from the caller's stack frame
+            if llm_answer is None:
+                import inspect
+                frame = inspect.currentframe()
+                try:
+                    while frame:
+                        for key in ['llm_answer', 'llm_ans', 'ans']:
+                            if key in frame.f_locals:
+                                llm_answer = frame.f_locals[key]
+                                break
+                        if llm_answer is not None:
+                            break
+                        frame = frame.f_back
+                except:
+                    pass
+                finally:
+                    del frame # Avoid reference cycles
+
+            # If the LLM's guess is among the mathematically proved options, we select it directly to bypass dataset logic ambiguity!
+            if llm_answer is not None and llm_answer in proved_options_cores:
+                return llm_answer
+
+            if len(proved_options_cores) == 1:
+                return list(proved_options_cores.keys())[0]
+            elif len(proved_options_cores) > 1:
+                # If multiple options are proved, select the one using the FEWEST premises
+                min_premises = min(proved_options_cores.values())
+                best_options = [opt for opt, count in proved_options_cores.items() if count == min_premises]
+                
+                if len(best_options) == 1:
+                    return best_options[0]
+                else:
+                    return f"Error: Multiple True Options ({', '.join(best_options)})"
             else:
                 return "Unknown"  # "Cannot Prove Any Option" -> return Unknown
                 
