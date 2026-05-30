@@ -1,6 +1,6 @@
 import re
 import ast
-import z3 as _z3
+from z3 import z3 as _z3
 from typing import List, Dict, Any, Union
 
 # Define Universal Real Sort for generic entity domain in Z3
@@ -42,66 +42,62 @@ def CustomForAll(vars_list, body):
 def CustomExists(vars_list, body):
     return _z3.Exists(vars_list, coerce_to_bool(body))
 
-def clean_and_register_names(fol_str: str, string_map: Dict[str, str]) -> str:
-    """Standardize string formatting, handle multi-word predicates, and extract string literals."""
-    # Join multi-word predicates with _ (e.g., passed science assessment(x) -> passed_science_assessment(x))
-    fol_clean = re.sub(r'\b([a-z]+(?:\s+[a-z]+)+)\s*\(', lambda m: m.group(1).replace(' ', '_') + '(', fol_str)
-    fol_clean = fol_clean.strip().rstrip('.$')
-    fol_clean = fol_clean.replace("^", "**")
-    
+def clean_and_register_names(fol_str: str, string_map: dict) -> str:
+    fol_clean = fol_str.strip().rstrip('.$')
     string_literals = re.findall(r"'([^']*)'", fol_clean)
-    for idx_lit, s_lit in enumerate(string_literals):
-        var_name = f'str_lit_{idx_lit}'
-        fol_clean = fol_clean.replace(f"'{s_lit}'", var_name)
-        string_map[var_name] = s_lit
-        
+    for s_lit in string_literals:
+        existing_var = None
+        for var, val in string_map.items():
+            if val == s_lit:
+                existing_var = var
+                break
+        if existing_var:
+            fol_clean = fol_clean.replace(f"'{s_lit}'", existing_var)
+        else:
+            var_name = f'str_lit_{len(string_map)}'
+            fol_clean = fol_clean.replace(f"'{s_lit}'", var_name)
+            string_map[var_name] = s_lit
     return fol_clean
 
+def get_clean_question_text(question_text: str) -> str:
+    """Isolate the actual question prompt by stripping answer options (A., B., C., D.) from the text.
+    This prevents keywords inside option text from polluting classification."""
+    if not question_text:
+        return ""
+    parts = re.split(r'\n(?=[A-D]\.| *\([A-D]\)| *\[[A-D]\])', question_text)
+    return parts[0].strip()
+
+def classify_mcq_strategy(question_text: str) -> str:
+    """Classify the MCQ tie-breaking strategy from the *cleaned* question text.
+    
+    Returns one of:
+      'fewest_premises'      – pick the option provable with the smallest unsat core
+      'cannot_be_concluded'  – pick the option that is NOT provable
+      'strongest'            – (default) pick the option with the deepest reasoning chain
+    """
+    if not question_text:
+        return "strongest"
+    q_clean = get_clean_question_text(question_text)
+    q_lower = q_clean.lower()
+    
+    # --- "cannot be concluded" family ---
+    if any(kw in q_lower for kw in [
+        "cannot be concluded", "cannot be inferred", "not follow",
+        "not be concluded", "not be inferred", "cannot follow",
+    ]):
+        return "cannot_be_concluded"
+    
+    # --- "fewest premises" family ---
+    if "fewest" in q_lower:
+        return "fewest_premises"
+    # "least" but NOT "at least" (existential quantifier phrasing)
+    if "least" in q_lower and not re.search(r'\bat\s+least\b', q_lower):
+        return "fewest_premises"
+    
+    return "strongest"
+
 class FOLASTTransformer(ast.NodeTransformer):
-    """AST Transformer to map Python logic operators and dynamic functions to Z3 equivalents."""
-    def visit_Compare(self, node):
-        if isinstance(node.left, ast.BinOp) and isinstance(node.left.op, (ast.BitAnd, ast.BitOr)):
-            binop = node.left
-            new_compare = ast.Compare(
-                left=binop.right,
-                ops=node.ops,
-                comparators=node.comparators
-            )
-            ast.copy_location(new_compare, node)
-            func_name = 'And' if isinstance(binop.op, ast.BitAnd) else 'Or'
-            call_node = ast.Call(
-                func=ast.Name(id=func_name, ctx=ast.Load()),
-                args=[binop.left, new_compare],
-                keywords=[]
-            )
-            ast.copy_location(call_node, node)
-            return self.visit(call_node)
-        
-        self.generic_visit(node)
-        return node
-
-    def visit_BinOp(self, node):
-        self.generic_visit(node)
-        if isinstance(node.op, ast.Pow):
-            return ast.Call(
-                func=ast.Name(id='Power', ctx=ast.Load()),
-                args=[node.left, node.right],
-                keywords=[]
-            )
-        elif isinstance(node.op, ast.BitAnd):
-            return ast.Call(
-                func=ast.Name(id='And', ctx=ast.Load()),
-                args=[node.left, node.right],
-                keywords=[]
-            )
-        elif isinstance(node.op, ast.BitOr):
-            return ast.Call(
-                func=ast.Name(id='Or', ctx=ast.Load()),
-                args=[node.left, node.right],
-                keywords=[]
-            )
-        return node
-
+    """AST Transformer to map dynamic functions to Z3 equivalents with arity information."""
     def visit_Call(self, node):
         self.generic_visit(node)
         if isinstance(node.func, ast.Name):
@@ -111,7 +107,7 @@ class FOLASTTransformer(ast.NodeTransformer):
                 node.func.id = f'{func_name}_arity_{arity}'
         return node
 
-def run_single_z3_verification(premises: List[str], conclusion_fol: Union[str, Dict[str, str]], timeout_ms: int = 2000, llm_answer: str = None) -> str:
+def run_single_z3_verification(premises: List[str], conclusion_fol: Union[str, Dict[str, str]], timeout_ms: int = 2000, llm_answer: str = None, question_text: str = None) -> str:
     """
     Convert FOL premises and a conclusion to Z3, solve it, and return the verified logical answer.
     
@@ -119,6 +115,8 @@ def run_single_z3_verification(premises: List[str], conclusion_fol: Union[str, D
         premises: List of normalized FOL strings.
         conclusion_fol: A string (for Yes/No) or a dict mapping options (A, B, C, D) to FOL strings (for MCQ).
         timeout_ms: Timeout limit for Z3 solver in milliseconds.
+        llm_answer: Optional LLM-provided answer to trust if it is among proved options.
+        question_text: Optional raw question text used for classifying the MCQ strategy.
         
     Returns:
         "Yes", "No", "Unknown", specific MCQ option (e.g. "A", "B", "C", "D"), or "Error".
@@ -271,6 +269,7 @@ def run_single_z3_verification(premises: List[str], conclusion_fol: Union[str, D
                 tracking_solver.add(_z3.Implies(p, prem_expr))
                 
             proved_options_cores = {}
+            opt_exprs = {}
             for opt, opt_fol in conclusion_fol.items():
                 cleaned_opt = clean_and_register_names(opt_fol, string_map)
                 tree = ast.parse(cleaned_opt, mode='eval')
@@ -279,6 +278,7 @@ def run_single_z3_verification(premises: List[str], conclusion_fol: Union[str, D
                 ast.fix_missing_locations(transformed_tree)
                 code = compile(transformed_tree, filename='<ast>', mode='eval')
                 opt_expr = coerce_to_bool(eval(code, {'__builtins__': {}}, ns))
+                opt_exprs[opt] = opt_expr
                 
                 tracking_solver.push()
                 tracking_solver.add(_z3.Not(opt_expr))
@@ -286,44 +286,101 @@ def run_single_z3_verification(premises: List[str], conclusion_fol: Union[str, D
                 
                 if res == _z3.unsat:
                     core = tracking_solver.unsat_core()
-                    proved_options_cores[opt] = len(core)
+                    proved_options_cores[opt] = {str(x) for x in core}
                 tracking_solver.pop()
                 
-            # If llm_answer was not passed directly, try to dynamically resolve it from the caller's stack frame
-            if llm_answer is None:
-                import inspect
-                frame = inspect.currentframe()
-                try:
-                    while frame:
-                        for key in ['llm_answer', 'llm_ans', 'ans']:
-                            if key in frame.f_locals:
-                                llm_answer = frame.f_locals[key]
-                                break
-                        if llm_answer is not None:
-                            break
-                        frame = frame.f_back
-                except:
-                    pass
-                finally:
-                    del frame # Avoid reference cycles
-
-            # If the LLM's guess is among the mathematically proved options, we select it directly to bypass dataset logic ambiguity!
+            # If the LLM's answer is explicitly provided and is among proved options, trust it
             if llm_answer is not None and llm_answer in proved_options_cores:
                 return llm_answer
 
-            if len(proved_options_cores) == 1:
-                return list(proved_options_cores.keys())[0]
-            elif len(proved_options_cores) > 1:
-                # If multiple options are proved, select the one using the FEWEST premises
-                min_premises = min(proved_options_cores.values())
-                best_options = [opt for opt, count in proved_options_cores.items() if count == min_premises]
-                
-                if len(best_options) == 1:
-                    return best_options[0]
+            # Classify the MCQ strategy from the question text
+            strategy = classify_mcq_strategy(question_text) if question_text else "strongest"
+            
+            proved_options = list(proved_options_cores.keys())
+            all_option_keys = list(conclusion_fol.keys())
+            
+            # ── Strategy: cannot_be_concluded ──
+            # Pick the option(s) that Z3 could NOT prove from the premises.
+            if strategy == "cannot_be_concluded":
+                unproved = [opt for opt in all_option_keys if opt not in proved_options_cores]
+                if len(unproved) == 1:
+                    return unproved[0]
+                elif len(unproved) > 1:
+                    return unproved[0]  # fallback: first unproved
                 else:
-                    return f"Error: Multiple True Options ({', '.join(best_options)})"
+                    return "Unknown"  # all proved – unexpected for this question type
+            
+            # ── Common path for strongest / fewest_premises ──
+            if len(proved_options) == 1:
+                return proved_options[0]
+            elif len(proved_options) > 1:
+                # Step 1: Structural Strength Check
+                scores = {opt: 0 for opt in proved_options}
+                for opt_i in proved_options:
+                    for opt_j in proved_options:
+                        if opt_i == opt_j:
+                            continue
+                        expr_i = opt_exprs[opt_i]
+                        expr_j = opt_exprs[opt_j]
+                        struct_solver = _z3.Solver()
+                        struct_solver.set("timeout", timeout_ms)
+                        struct_solver.add(_z3.Not(_z3.Implies(expr_i, expr_j)))
+                        if struct_solver.check() == _z3.unsat:
+                            scores[opt_i] += 1
+                            
+                if strategy == "strongest":
+                    # For strongest: prefer highest implication score
+                    max_score = max(scores.values())
+                    best_by_strength = [opt for opt, score in scores.items() if score == max_score]
+                else:
+                    # For fewest_premises: prefer lowest implication score (shallowest)
+                    min_score = min(scores.values())
+                    best_by_strength = [opt for opt, score in scores.items() if score == min_score]
+                
+                if len(best_by_strength) == 1:
+                    return best_by_strength[0]
+                else:
+                    # Step 2: Unsat Core Subset Inclusion Check
+                    best_by_inclusion = []
+                    has_any_subset_relation = False
+                    for opt_i in proved_options:
+                        core_i = proved_options_cores[opt_i]
+                        is_superset = False
+                        for opt_j in proved_options:
+                            if opt_i == opt_j:
+                                continue
+                            core_j = proved_options_cores[opt_j]
+                            if core_j.issubset(core_i) and core_j != core_i:
+                                is_superset = True
+                                has_any_subset_relation = True
+                                break
+                        if strategy == "strongest":
+                            # Keep supersets (deeper chains)
+                            if is_superset:
+                                best_by_inclusion.append(opt_i)
+                        else:
+                            # fewest_premises: keep subsets (shallower chains)
+                            if not is_superset:
+                                best_by_inclusion.append(opt_i)
+                    
+                    # Only apply inclusion filter when at least 1 subset pair exists
+                    # AND the filter does not eliminate everything
+                    if has_any_subset_relation and len(best_by_inclusion) > 0:
+                        proved_options = best_by_inclusion
+                        
+                    # Step 3: Core Size Fallback
+                    if strategy == "strongest":
+                        target_size = max(len(proved_options_cores[opt]) for opt in proved_options)
+                    else:
+                        target_size = min(len(proved_options_cores[opt]) for opt in proved_options)
+                    best_by_core = [opt for opt in proved_options if len(proved_options_cores[opt]) == target_size]
+                    
+                    if len(best_by_core) == 1:
+                        return best_by_core[0]
+                    else:
+                        return "Unknown"
             else:
-                return "Unknown"  # "Cannot Prove Any Option" -> return Unknown
+                return "Unknown"
                 
         # Case B: Yes/No Question with a single conclusion string
         elif isinstance(conclusion_fol, str):
