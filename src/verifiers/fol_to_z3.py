@@ -1,7 +1,96 @@
 import re
 import ast
+import keyword
 from z3 import z3 as _z3
 from typing import List, Dict, Any, Union
+
+try:
+    from rapidfuzz import fuzz
+except ImportError:
+    fuzz = None
+
+def sanitize_python_keywords(fol_str: str) -> str:
+    """Sanitize Python reserved keywords used as identifiers in FOL formulas to prevent AST syntax errors."""
+    words = re.findall(r'\b([a-zA-Z_]\w*)\b', fol_str)
+    protected_keywords = {'And', 'Or', 'Not', 'Implies', 'ForAll', 'Exists', 'Iff', 'Power'}
+    for w in words:
+        if keyword.iskeyword(w) and w not in protected_keywords:
+            fol_str = re.sub(rf'\b{w}\b', f"{w}_", fol_str)
+    return fol_str
+
+def align_vocabulary(premises: List[str], conclusion_fol: Union[str, Dict[str, str]]) -> tuple:
+    """Use rapidfuzz to automatically align predicates and constants that have high similarity to ensure Z3 proof connectivity."""
+    if fuzz is None:
+        return premises, conclusion_fol
+
+    # Gather all strings to extract vocabulary
+    all_strs = list(premises)
+    if isinstance(conclusion_fol, dict):
+        all_strs.extend(conclusion_fol.values())
+    elif isinstance(conclusion_fol, str):
+        all_strs.append(conclusion_fol)
+
+    # Extract potential vocabulary words (length > 3 to avoid variables, excluding logical operators)
+    candidates = set()
+    protected = {'ForAll', 'Exists', 'Implies', 'And', 'Or', 'Not', 'Iff', 'Power'}
+    for s in all_strs:
+        words = re.findall(r'\b([a-zA-Z_]\w{3,})\b', s)
+        for w in words:
+            if w not in protected:
+                candidates.add(w)
+
+    # Calculate word frequency to prioritize canonical terms
+    word_freq = {}
+    for s in all_strs:
+        for w in re.findall(r'\b([a-zA-Z_]\w{3,})\b', s):
+            word_freq[w] = word_freq.get(w, 0) + 1
+
+    # Sort candidates by frequency (most common first) and length (longer first)
+    sorted_candidates = sorted(list(candidates), key=lambda x: (word_freq.get(x, 0), len(x)), reverse=True)
+
+    # Find high-similarity pairs and build a rewrite map
+    rewrite_map = {}
+    for i in range(len(sorted_candidates)):
+        w1 = sorted_candidates[i]
+        if w1 in rewrite_map:
+            continue
+        for j in range(i + 1, len(sorted_candidates)):
+            w2 = sorted_candidates[j]
+            if w2 in rewrite_map:
+                continue
+            # Calculate token sort similarity ratio
+            sim = fuzz.token_sort_ratio(w1, w2)
+            if sim >= 85.0:
+                # Map the less frequent/shorter word to the more canonical one
+                rewrite_map[w2] = w1
+
+    # Rewrite premises
+    aligned_premises = []
+    for s in premises:
+        s_new = s
+        for w_old, w_new in rewrite_map.items():
+            s_new = re.sub(rf'\b{w_old}\b', w_new, s_new)
+        aligned_premises.append(s_new)
+
+    # Rewrite conclusion
+    aligned_conclusion = conclusion_fol
+    if isinstance(conclusion_fol, dict):
+        aligned_conclusion = {}
+        for k, s in conclusion_fol.items():
+            s_new = s
+            for w_old, w_new in rewrite_map.items():
+                s_new = re.sub(rf'\b{w_old}\b', w_new, s_new)
+            aligned_conclusion[k] = s_new
+    elif isinstance(conclusion_fol, str):
+        s_new = conclusion_fol
+        for w_old, w_new in rewrite_map.items():
+            s_new = re.sub(rf'\b{w_old}\b', w_new, s_new)
+        aligned_conclusion = s_new
+
+    if rewrite_map:
+        print(f"[Z3 Vocab Aligner] Aligned terms: {rewrite_map}")
+
+    return aligned_premises, aligned_conclusion
 
 # Define Universal Real Sort for generic entity domain in Z3
 UniversalSort = _z3.RealSort()
@@ -43,6 +132,7 @@ def CustomExists(vars_list, body):
     return _z3.Exists(vars_list, coerce_to_bool(body))
 
 def clean_and_register_names(fol_str: str, string_map: dict) -> str:
+    fol_str = sanitize_python_keywords(fol_str)
     fol_clean = fol_str.strip().rstrip('.$')
     string_literals = re.findall(r"'([^']*)'", fol_clean)
     for s_lit in string_literals:
@@ -121,6 +211,9 @@ def run_single_z3_verification(premises: List[str], conclusion_fol: Union[str, D
     Returns:
         "Yes", "No", "Unknown", specific MCQ option (e.g. "A", "B", "C", "D"), or "Error".
     """
+    # Align vocabulary using rapidfuzz before Z3 compilation
+    premises, conclusion_fol = align_vocabulary(premises, conclusion_fol)
+    
     all_fol_strings = list(premises)
     if isinstance(conclusion_fol, dict):
         all_fol_strings.extend(conclusion_fol.values())
