@@ -1,0 +1,399 @@
+{
+  "logic": [
+    {
+      "request_payload": {
+        "options": ["A", "B", "C", "D"],
+        "premises": [
+          "If a package is medical and weighs under 2 kilograms, then it receives priority delivery status.",
+          "If a package has priority delivery status and its route is clear, then it can be dispatched.",
+          "If a package can be dispatched and the weather is safe, then it is eligible to use the aerial corridor.",
+          "If a package is eligible to use the aerial corridor and an operator is assigned, then launch is approved.",
+          "If an emergency waiver is approved and an alternate route is mapped, then the route is clear.",
+          "The MedKit-7 package is medical.",
+          "The MedKit-7 package weighs under 2 kilograms.",
+          "An emergency waiver is approved for MedKit-7.",
+          "An alternate route is mapped for MedKit-7.",
+          "The weather is safe for MedKit-7."
+        ],
+        "query": "Based on the drone delivery rules, which conclusion is logically supported?\nA. MedKit-7 cannot be dispatched because the route is blocked\nB. MedKit-7 has launch approval\nC. MedKit-7 is eligible to use the aerial corridor\nD. MedKit-7 is not a priority package",
+        "query_id": "REG_T1_0025",
+        "type": "type1"
+      },
+      "expected": {
+        "aliases": [
+          "C",
+          "Option C",
+          "C. MedKit-7 is eligible to use the aerial corridor",
+          "MedKit-7 is eligible to use the aerial corridor"
+        ],
+        "answer": "C",
+        "premises_used": [0, 1, 2, 4, 5, 6, 7, 8, 9],
+        "unit": ""
+      }
+    },
+    {
+      "request_payload": {
+        "options": ["Yes", "No", "Uncertain"],
+        "premises": [
+          "If a package is medical and weighs under 2 kilograms, then it receives priority delivery status.",
+          "If a package has priority delivery status and its route is clear, then it can be dispatched.",
+          "If a package can be dispatched and the weather is safe, then it is eligible to use the aerial corridor.",
+          "If a package is eligible to use the aerial corridor and an operator is assigned, then launch is approved.",
+          "If an emergency waiver is approved and an alternate route is mapped, then the route is clear.",
+          "The MedKit-7 package is medical.",
+          "The MedKit-7 package weighs under 2 kilograms.",
+          "An emergency waiver is approved for MedKit-7.",
+          "An alternate route is mapped for MedKit-7.",
+          "The weather is safe for MedKit-7."
+        ],
+        "query": "Is MedKit-7 eligible to use the aerial corridor, according to the premises?",
+        "query_id": "REG_T1_0026",
+        "type": "type1"
+      },
+      "expected": {
+        "aliases": ["Y", "yes"],
+        "answer": "Yes",
+        "premises_used": [0, 1, 2, 4, 5, 6, 7, 8, 9],
+        "unit": ""
+      }
+    },
+    {
+      "request_payload": {
+        "options": ["A", "B", "C", "D"],
+        "premises": [
+          "If a manuscript is scanned at 600 dpi and its metadata is complete, then it is preservation-ready.",
+          "If a manuscript is preservation-ready and its rights are cleared, then it is eligible for the public portal.",
+          "If a manuscript is eligible for the public portal and OCR has been verified, then it is searchable online.",
+          "If a manuscript contains personal data, then privacy review is required.",
+          "If privacy review is required and redaction is complete, then the manuscript is safe for public release.",
+          "The River Codex was scanned at 600 dpi.",
+          "The River Codex metadata is complete.",
+          "The River Codex rights are cleared.",
+          "The River Codex OCR has been verified.",
+          "The River Codex contains personal data."
+        ],
+        "query": "Based on the digitization rules, which conclusion is correct?\nA. The River Codex is not eligible for the public portal\nB. The River Codex is searchable online, but safe public release is not established\nC. The River Codex lacks OCR verification\nD. The River Codex is safe for public release because it contains personal data",
+        "query_id": "REG_T1_0031",
+        "type": "type1"
+      },
+      "expected": {
+        "aliases": [
+          "B",
+          "Option B",
+          "B. The River Codex is searchable online, but safe public release is not established",
+          "The River Codex is searchable online, but safe public release is not established"
+        ],
+        "answer": "B",
+        "premises_used": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+        "unit": ""
+      }
+    },
+    {
+      "request_payload": {
+        "options": ["Yes", "No", "Uncertain"],
+        "premises": [
+          "If a manuscript is scanned at 600 dpi and its metadata is complete, then it is preservation-ready.",
+          "If a manuscript is preservation-ready and its rights are cleared, then it is eligible for the public portal.",
+          "If a manuscript is eligible for the public portal and OCR has been verified, then it is searchable online.",
+          "If a manuscript contains personal data, then privacy review is required.",
+          "If privacy review is required and redaction is complete, then the manuscript is safe for public release.",
+          "The River Codex was scanned at 600 dpi.",
+          "The River Codex metadata is complete.",
+          "The River Codex rights are cleared.",
+          "The River Codex OCR has been verified.",
+          "The River Codex contains personal data."
+        ],
+        "query": "Do the premises establish that the River Codex is safe for public release?",
+        "query_id": "REG_T1_0032",
+        "type": "type1"
+      },
+      "expected": {
+        "aliases": ["N", "no"],
+        "answer": "No",
+        "premises_used": [3, 4, 9],
+        "unit": ""
+      }
+    },
+    {
+      "request_payload": {
+        "options": ["A", "B", "C", "D"],
+        "premises": [
+          "If soil moisture is low and a heatwave is active, then irrigation is needed.",
+          "If irrigation is needed and the reservoir has water, then irrigation is scheduled.",
+          "If irrigation is scheduled and sensor calibration is current, then autonomous watering is allowed.",
+          "If pest risk is high, then pesticide review is required.",
+          "If pesticide review is required and agronomist approval is given, then chemical treatment is allowed.",
+          "Greenhouse Basil has low soil moisture.",
+          "A heatwave is active for Greenhouse Basil.",
+          "The Greenhouse Basil reservoir has water.",
+          "The Greenhouse Basil sensor calibration is current.",
+          "Greenhouse Basil has high pest risk."
+        ],
+        "query": "Based on the smart greenhouse rules, which conclusion is supported?\nA. The reservoir lacks water\nB. Chemical treatment is allowed for Greenhouse Basil\nC. Irrigation is unnecessary because a heatwave is active\nD. Autonomous watering is allowed for Greenhouse Basil",
+        "query_id": "REG_T1_0035",
+        "type": "type1"
+      },
+      "expected": {
+        "aliases": [
+          "D",
+          "Option D",
+          "D. Autonomous watering is allowed for Greenhouse Basil",
+          "Autonomous watering is allowed for Greenhouse Basil"
+        ],
+        "answer": "D",
+        "premises_used": [0, 1, 2, 5, 6, 7, 8],
+        "unit": ""
+      }
+    }
+  ],
+  "physics": [
+    {
+      "request_payload": {
+        "premises": [],
+        "query": "A capacitor has capacitance C = 47 μF and is connected to a potential difference U = 12 V. Calculate the energy stored in the capacitor.",
+        "query_id": "REG_T2_0001",
+        "type": "type2"
+      },
+      "expected": {
+        "aliases": [],
+        "answer": "3.38 × 10^-3",
+        "premises_used": [],
+        "unit": "J"
+      }
+    },
+    {
+      "request_payload": {
+        "premises": [],
+        "query": "A capacitor stores a charge Q = 2.4 mC when connected to a voltage U = 16 V. Calculate the capacitance of the capacitor.",
+        "query_id": "REG_T2_0002",
+        "type": "type2"
+      },
+      "expected": {
+        "aliases": [],
+        "answer": "150",
+        "premises_used": [],
+        "unit": "uF"
+      }
+    },
+    {
+      "request_payload": {
+        "premises": [],
+        "query": "Two point charges q1 = +3.0 μC and q2 = -5.0 μC are separated by a distance of 0.30 m in air. Calculate the magnitude of the electrostatic force between them. Use k = 9.0 × 10^9 N·m²/C².",
+        "query_id": "REG_T2_0003",
+        "type": "type2"
+      },
+      "expected": {
+        "aliases": [],
+        "answer": "1.5",
+        "premises_used": [],
+        "unit": "N"
+      }
+    },
+    {
+      "request_payload": {
+        "premises": [],
+        "query": "Two charges +4.0 nC and -4.0 nC are fixed 20 cm apart in air. Calculate the magnitude of the electric field at the midpoint between the charges. Use k = 9.0 × 10^9 N·m²/C².",
+        "query_id": "REG_T2_0004",
+        "type": "type2"
+      },
+      "expected": {
+        "aliases": [],
+        "answer": "7.20 × 10^3",
+        "premises_used": [],
+        "unit": "N/C"
+      }
+    },
+    {
+      "request_payload": {
+        "premises": [],
+        "query": "Two capacitors C1 = 6.0 μF and C2 = 3.0 μF are connected in series across an 18 V battery. Calculate the charge stored on each capacitor.",
+        "query_id": "REG_T2_0006",
+        "type": "type2"
+      },
+      "expected": {
+        "aliases": [],
+        "answer": "36",
+        "premises_used": [],
+        "unit": "uC"
+      }
+    },
+    {
+      "request_payload": {
+        "premises": [],
+        "query": "An LC circuit has inductance L = 0.20 H and capacitance C = 50 μF. Calculate the resonant frequency of the circuit.",
+        "query_id": "REG_T2_0010",
+        "type": "type2"
+      },
+      "expected": {
+        "aliases": [],
+        "answer": "50.3",
+        "premises_used": [],
+        "unit": "Hz"
+      }
+    },
+    {
+      "request_payload": {
+        "premises": [],
+        "query": "An inductor with inductance L = 0.40 H is connected to an AC source of frequency f = 60 Hz. Calculate the inductive reactance.",
+        "query_id": "REG_T2_0011",
+        "type": "type2"
+      },
+      "expected": {
+        "aliases": [],
+        "answer": "151",
+        "premises_used": [],
+        "unit": "ohm"
+      }
+    },
+    {
+      "request_payload": {
+        "premises": [],
+        "query": "A car starts with an initial speed of 8 m/s and travels 66 m in 6 s with constant acceleration. Calculate the acceleration of the car.",
+        "query_id": "REG_T2_0012",
+        "type": "type2"
+      },
+      "expected": {
+        "aliases": [],
+        "answer": "1",
+        "premises_used": [],
+        "unit": "m/s^2"
+      }
+    },
+    {
+      "request_payload": {
+        "premises": [],
+        "query": "A 2.0 kg object starts from rest. A constant net force of 10 N acts on it over a distance of 5.0 m. Calculate the final speed of the object.",
+        "query_id": "REG_T2_0015",
+        "type": "type2"
+      },
+      "expected": {
+        "aliases": [],
+        "answer": "7.07",
+        "premises_used": [],
+        "unit": "m/s"
+      }
+    },
+    {
+      "request_payload": {
+        "premises": [],
+        "query": "How much heat is required to raise the temperature of 0.50 kg of water by 15 °C? Use c = 4200 J/(kg·°C).",
+        "query_id": "REG_T2_0017",
+        "type": "type2"
+      },
+      "expected": {
+        "aliases": [],
+        "answer": "3.15 × 10^4",
+        "premises_used": [],
+        "unit": "J"
+      }
+    },
+    {
+      "request_payload": {
+        "premises": [],
+        "query": "Calculate the heat required to melt 0.20 kg of ice at 0 °C. Use the latent heat of fusion of ice L = 3.34 × 10^5 J/kg.",
+        "query_id": "REG_T2_0018",
+        "type": "type2"
+      },
+      "expected": {
+        "aliases": [],
+        "answer": "6.68 × 10^4",
+        "premises_used": [],
+        "unit": "J"
+      }
+    },
+    {
+      "request_payload": {
+        "premises": [],
+        "query": "A gas sample contains n = 0.50 mol at temperature T = 300 K in a volume V = 0.010 m³. Calculate the pressure of the gas. Use R = 8.314 J/(mol·K).",
+        "query_id": "REG_T2_0019",
+        "type": "type2"
+      },
+      "expected": {
+        "aliases": [],
+        "answer": "1.25 × 10^5",
+        "premises_used": [],
+        "unit": "Pa"
+      }
+    },
+    {
+      "request_payload": {
+        "premises": [],
+        "query": "A charge q = 3 uC moves through a potential difference U = 5 V. Calculate the work done.",
+        "query_id": "REG_T2_0029",
+        "type": "type2"
+      },
+      "expected": {
+        "aliases": [],
+        "answer": "15",
+        "premises_used": [],
+        "unit": "uJ"
+      }
+    },
+    {
+      "request_payload": {
+        "premises": [],
+        "query": "A conductor has length l = 2 m, cross-sectional area S = 1 mm^2, and resistivity rho = 0.5 ohm*mm^2/m. Calculate its resistance.",
+        "query_id": "REG_T2_0039",
+        "type": "type2"
+      },
+      "expected": {
+        "aliases": [],
+        "answer": "1",
+        "premises_used": [],
+        "unit": "ohm"
+      }
+    },
+    {
+      "request_payload": {
+        "options": [],
+        "premises": [],
+        "query": "A test charge is placed at a point whose distances to the two charges q1 = +2 μC and q2 = -3 μC are 3 cm and 4 cm, respectively. The two charges are fixed and separated by 7 cm. What is the direction of the net electric force acting on the test charge?",
+        "query_id": "REG_T2_LD047",
+        "type": "type2"
+      },
+      "expected": {
+        "answer": "Directed toward q₂",
+        "unit": ""
+      }
+    },
+    {
+      "request_payload": {
+        "options": [],
+        "premises": [],
+        "query": "A capacitor C = 3 μF, is charged at 12 V, then its two plates are short-circuited. Calculate the charge and energy after short-circuiting.",
+        "query_id": "REG_T2_TD374",
+        "type": "type2"
+      },
+      "expected": {
+        "answer": "0; 0",
+        "unit": "μC; μJ"
+      }
+    },
+    {
+      "request_payload": {
+        "options": [],
+        "premises": [],
+        "query": "A parallel-plate capacitor is placed in a dielectric (ε = 4), with plate area S = 300 cm² and separation d = 1 mm. If the dielectric is replaced with one where ε = 2, how does the capacitance change?",
+        "query_id": "REG_T2_TD386",
+        "type": "type2"
+      },
+      "expected": {
+        "answer": "decreases by half",
+        "unit": ""
+      }
+    },
+    {
+      "request_payload": {
+        "options": [],
+        "premises": [],
+        "query": "Find the energy stored in a 50 uF capacitor when it is charged to a potential difference of 200 V.",
+        "query_id": "REG_T2_GEN_022",
+        "type": "type2"
+      },
+      "expected": {
+        "answer": "1",
+        "unit": "J"
+      }
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+httpx==0.28.1
+pydantic==2.10.4
+pydantic-settings==2.7.1
+python-dotenv==1.0.1
+pytest==8.3.4
+
+huggingface_hub>=0.24.0
+
+sympy==1.13.3
+z3-solver==4.13.3.0
+
+langchain-core
+langgraph

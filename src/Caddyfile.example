@@ -1,0 +1,10 @@
+# Replace these domains with your real domains.
+# Caddy will automatically issue HTTPS certificates if DNS points to this server.
+
+exact-api.example.com {
+    reverse_proxy 127.0.0.1:8080
+}
+
+exact-vllm.example.com {
+    reverse_proxy 127.0.0.1:8000
+}
