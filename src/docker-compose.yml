@@ -1,0 +1,51 @@
+services:
+  exact-api:
+    build: .
+    container_name: exact2026-api
+    env_file: .env
+    ports:
+      - "8080:8080"
+    depends_on:
+      - vllm
+    restart: unless-stopped
+
+  vllm:
+    image: vllm/vllm-openai:latest
+    container_name: exact2026-vllm
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - HF_TOKEN=${HF_TOKEN:-}
+    volumes:
+      - ~/.cache/huggingface:/root/.cache/huggingface
+      - ./models:/models
+    ports:
+      - "8000:8000"
+    ipc: host
+    command: >
+      bash -lc '
+      python - <<"PY"
+      from huggingface_hub import snapshot_download
+      snapshot_download(
+          repo_id="NguyenAn05/qwen2.5-type1-grpo-lora",
+          local_dir="/models/type1-lora",
+          local_dir_use_symlinks=False,
+      )
+      PY
+      exec vllm serve Qwen/Qwen2.5-7B-Instruct
+        --host 0.0.0.0
+        --port 8000
+        --max-model-len 4096
+        --gpu-memory-utilization 0.90
+        --enable-lora
+        --max-lora-rank 64
+        --lora-modules type1-logic=/models/type1-lora
+      '
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
